@@ -6,7 +6,7 @@
 <title>SmartHub AI v1.0.3</title>
 
 <style>
-
+    /* ---------- ОБЩИЕ СТИЛИ ---------- */
     :root {
         --bg: #0b0f19;
         --panel: #141a2c;
@@ -107,3 +107,205 @@
         flex: 1;
         padding: 10px;
         border-radius: 10px;
+        border: none;
+    }
+
+    button {
+        padding: 10px;
+        border: none;
+        border-radius: 10px;
+        cursor: pointer;
+        font-weight: bold;
+    }
+
+    #sendBtn { background: #00c3ff; }
+    #micBtn { background: #ff3b3b; }
+    #speakBtn { background: #00ff99; }
+
+    /* ---------- ПРАВАЯ ПАНЕЛЬ (НАСТРОЙКИ) ---------- */
+    .right-panel {
+        width: 280px;
+        background: var(--panel);
+        padding: 20px;
+        display: flex;
+        flex-direction: column;
+        gap: 20px;
+    }
+
+    .settings-title {
+        font-size: 20px;
+        margin-bottom: 10px;
+        text-align: center;
+    }
+
+    .toggle {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        background: rgba(255,255,255,0.05);
+        padding: 12px;
+        border-radius: 12px;
+        cursor: pointer;
+    }
+
+    #versionTag {
+        opacity: .4;
+        font-size: 14px;
+        text-align: center;
+        margin-top: auto;
+    }
+</style>
+</head>
+
+<body data-theme="dark">
+
+<!-- ------------- ЛЕВАЯ ПАНЕЛЬ (ЧАТ) ------------- -->
+<div class="left-panel">
+
+    <div class="header">SmartHub AI</div>
+
+    <div id="chat"></div>
+
+    <div class="input-bar">
+        <input id="userInput" type="text" placeholder="Введите сообщение...">
+        <button id="sendBtn" onclick="sendMessage()">➤</button>
+        <button id="micBtn" onclick="voiceInput()">🎤</button>
+        <button id="speakBtn" onclick="speakLast()">🔊</button>
+    </div>
+
+</div>
+
+<!-- ------------- ПРАВАЯ ПАНЕЛЬ (НАСТРОЙКИ) ------------- -->
+<div class="right-panel">
+
+    <div class="settings-title">⚙ Настройки</div>
+
+    <div class="toggle" onclick="toggleTheme()">
+        <span>Тема</span>
+        <span id="themeLabel">Тёмная</span>
+    </div>
+
+    <div class="toggle" onclick="toggleVoice()">
+        <span>Озвучка ответа</span>
+        <span id="voiceLabel">Выкл</span>
+    </div>
+
+    <div id="versionTag">SmartHub AI v1.0.3</div>
+</div>
+
+<script>
+/* ---------------- API ---------------- */
+const API_URL = "https://openai-proxy-ucgy.onrender.com/v1/chat/completions";
+
+let lastAIMessage = "";
+let autoVoice = false;
+
+/* ---------------- ЧАТ ---------------- */
+function addMessage(text, sender) {
+    const chat = document.getElementById("chat");
+
+    const wrap = document.createElement("div");
+    wrap.className = "msg " + sender;
+
+    const avatar = document.createElement("div");
+    avatar.className = "avatar";
+
+    const img = document.createElement("img");
+    img.src = sender === "user" ? "avatar-user.png" : "avatar-ai.png";
+    avatar.appendChild(img);
+
+    const bubble = document.createElement("div");
+    bubble.className = "bubble";
+    bubble.textContent = text;
+
+    wrap.appendChild(avatar);
+    wrap.appendChild(bubble);
+    chat.appendChild(wrap);
+
+    chat.scrollTop = chat.scrollHeight;
+}
+
+/* ---------------- ОТПРАВКА ---------------- */
+async function sendMessage() {
+    const input = document.getElementById("userInput");
+    const text = input.value.trim();
+    if (!text) return;
+
+    addMessage(text, "user");
+    input.value = "";
+
+    const res = await fetch(API_URL, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+            model: "gpt-4o-mini",
+            messages: [{ role: "user", content: text }]
+        })
+    });
+
+    const data = await res.json();
+    const ai = data.choices?.[0]?.message?.content || "Ошибка ответа";
+
+    lastAIMessage = ai;
+    addMessage(ai, "ai");
+
+    if (autoVoice) speak(ai);
+}
+
+/* ---------------- ОЗВУЧКА ---------------- */
+function speak(text){
+    const u = new SpeechSynthesisUtterance(text);
+    u.lang = "ru-RU";
+    u.rate = 1;
+    speechSynthesis.speak(u);
+}
+
+function speakLast(){
+    if (!lastAIMessage) return alert("Нет текста");
+    speak(lastAIMessage);
+}
+
+/* ---------------- ГОЛОСОВОЙ ВВОД ---------------- */
+function voiceInput() {
+    const R = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!R) return alert("Ваш браузер не поддерживает микрофон");
+
+    const rec = new R();
+    rec.lang = "ru-RU";
+    rec.start();
+
+    document.getElementById("micBtn").style.background = "#ffa200";
+
+    rec.onresult = e => {
+        document.getElementById("userInput").value = e.results[0][0].transcript;
+        document.getElementById("micBtn").style.background = "#ff3b3b";
+    };
+
+    rec.onend = () => {
+        document.getElementById("micBtn").style.background = "#ff3b3b";
+    };
+}
+
+/* ---------------- ТЕМА ---------------- */
+function toggleTheme(){
+    const body = document.body;
+    const label = document.getElementById("themeLabel");
+
+    if (body.dataset.theme === "dark") {
+        body.dataset.theme = "light";
+        label.textContent = "Светлая";
+    } else {
+        body.dataset.theme = "dark";
+        label.textContent = "Тёмная";
+    }
+}
+
+/* ---------------- ОЗВУЧКА ВКЛ/ВЫКЛ ---------------- */
+function toggleVoice(){
+    autoVoice = !autoVoice;
+    document.getElementById("voiceLabel").textContent = autoVoice ? "Вкл" : "Выкл";
+}
+</script>
+
+</body>
+</html>
