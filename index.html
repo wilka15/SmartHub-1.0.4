@@ -1,484 +1,78 @@
 <!DOCTYPE html>
 <html lang="ru">
 <head>
-<meta charset="utf-8" />
-<meta name="viewport" content="width=device-width,initial-scale=1" />
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>SmartHub AI v1.0.3</title>
-<style>
-  :root{
-    --bg-dark: #0b0f19;
-    --panel-dark: #0f1624;
-    --text-dark: #e8f9ff;
-    --bg-light: #f4f7fb;
-    --panel-light: #ffffff;
-    --text-light: #0b1130;
-    --accent: #00d4ff;
-    --user-bubble: linear-gradient(90deg,#00c2ff,#00ffa3);
-    --ai-bubble: linear-gradient(180deg,#0b1b1a,#073024);
-  }
-  [data-theme="dark"]{
-    --bg: var(--bg-dark);
-    --panel: var(--panel-dark);
-    --text: var(--text-dark);
-  }
-  [data-theme="light"]{
-    --bg: var(--bg-light);
-    --panel: var(--panel-light);
-    --text: var(--text-light);
-  }
 
-  html,body{height:100%; margin:0;}
-  body{
-    font-family: Inter, Roboto, Arial, sans-serif;
-    background: radial-gradient(1200px 600px at 10% 10%, rgba(0,200,255,0.04), transparent),
-                linear-gradient(135deg,var(--bg) 0%, #101827 100%);
-    color:var(--text);
-    display:flex; align-items:stretch; justify-content:center;
-  }
+<!-- Подключение CSS -->
+<link rel="stylesheet" href="styles.css">
 
-  .app {
-    width:98%;
-    max-width:1100px;
-    height:88vh;
-    margin: 3vh 0;
-    display:grid;
-    grid-template-columns: 1fr 320px;
-    gap:18px;
-  }
-
-  /* LEFT: CHAT PANEL */
-  .panel {
-    background: rgba(255,255,255,0.03);
-    border-radius:14px;
-    padding:16px;
-    display:flex;
-    flex-direction:column;
-    box-shadow: 0 10px 40px rgba(0,0,0,0.45);
-    backdrop-filter: blur(8px);
-  }
-
-  .header {
-    display:flex; align-items:center; justify-content:space-between;
-    padding-bottom:8px; border-bottom:1px solid rgba(255,255,255,0.03);
-  }
-  .title { font-weight:700; font-size:20px; display:flex; gap:10px; align-items:center;}
-  .subtitle { font-size:12px; opacity:0.7; }
-
-  #chat {
-    flex:1; overflow:auto; padding:12px 6px; display:flex; flex-direction:column; gap:12px;
-    margin-top:12px;
-  }
-
-  /* message row */
-  .msg {
-    display:flex; gap:10px; align-items:flex-start; max-width:85%;
-    animation: msgIn .22s ease;
-  }
-  @keyframes msgIn { from{opacity:0; transform:translateY(8px);} to{opacity:1; transform:none;} }
-
-  .msg.user { align-self:flex-end; flex-direction:row-reverse; }
-  .bubble {
-    background: rgba(255,255,255,0.03);
-    padding:10px 14px; border-radius:12px; line-height:1.4;
-    box-shadow: 0 6px 18px rgba(0,0,0,0.4);
-    position:relative;
-  }
-  .msg.user .bubble { background: var(--user-bubble); color:#012; }
-  .msg.ai .bubble { background: var(--ai-bubble); color:#e8ffe7; }
-
-  /* avatar: 3D sphere style (CSS) */
-  .avatar {
-    width:46px; height:46px; border-radius:50%; flex:0 0 46px; position:relative;
-    display:flex; align-items:center; justify-content:center; overflow:hidden;
-    box-shadow: 0 8px 24px rgba(0,0,0,0.45);
-  }
-  /* 3D sphere look using gradients and an inner highlight */
-  .sphere {
-    width:100%; height:100%; border-radius:50%;
-    background: radial-gradient(circle at 30% 25%, rgba(255,255,255,0.30), rgba(255,255,255,0.06) 6%, transparent 15%),
-                conic-gradient(from 200deg at 50% 50%, rgba(0,160,255,0.18), rgba(120,60,255,0.12), rgba(0,255,180,0.15));
-    position:relative; transform: translateZ(0);
-    animation: slowRotate 8s linear infinite;
-  }
-  .sphere::after {
-    content:""; position:absolute; inset:0; border-radius:50%;
-    box-shadow: inset -10px -8px 40px rgba(0,0,0,0.45), inset 10px 8px 18px rgba(255,255,255,0.02);
-    pointer-events:none;
-  }
-  @keyframes slowRotate { 0%{filter:hue-rotate(0deg);} 50%{filter:hue-rotate(20deg);} 100%{filter:hue-rotate(0deg);} }
-
-  /* speaking pulse */
-  .avatar.speaking .sphere { transform:scale(1.06); box-shadow:0 10px 40px rgba(0,212,255,0.14); transition:transform .25s; }
-
-  /* typing indicator */
-  .typing { display:inline-flex; gap:6px; align-items:center; padding:6px 10px; border-radius:10px; background:rgba(255,255,255,0.02); }
-  .dot { width:8px; height:8px; border-radius:50%; background:var(--accent); animation:dot 1s infinite; opacity:0.4 }
-  .dot:nth-child(2){ animation-delay:.12s }
-  .dot:nth-child(3){ animation-delay:.24s }
-  @keyframes dot { 0%{transform:translateY(0); opacity:0.4} 50%{transform:translateY(-6px); opacity:1} 100%{transform:translateY(0); opacity:0.4} }
-
-  /* input area */
-  .input {
-    display:flex; gap:10px; margin-top:12px; align-items:center;
-  }
-  .input input[type="text"]{
-    flex:1; padding:12px; border-radius:12px; border:none; font-size:15px;
-    box-shadow:inset 0 2px 8px rgba(0,0,0,0.4);
-  }
-  .btn { padding:10px 12px; border-radius:10px; border:none; cursor:pointer; font-weight:600; }
-  .btn-primary{ background:var(--accent); color:#012; }
-  .btn-red{ background:#ff5b5b; color:white; }
-  .btn-green{ background:#00ff99; color:#012; }
-
-  /* RIGHT: SETTINGS */
-  .settings {
-    background: rgba(255,255,255,0.02);
-    border-radius:12px; padding:16px; display:flex; flex-direction:column; gap:12px;
-    min-width:280px;
-  }
-  .settings h3{ margin:0; font-size:18px; text-align:center; }
-  .row{ display:flex; justify-content:space-between; align-items:center; padding:10px; border-radius:10px; background:rgba(255,255,255,0.02);}
-  .row .label{ font-weight:600; }
-  .switch { display:flex; gap:8px; align-items:center; }
-  .small{ font-size:13px; opacity:0.8; }
-
-  #version { text-align:center; opacity:0.6; margin-top:auto; font-weight:700; color:var(--accent); }
-  /* responsive */
-  @media (max-width:1000px){
-    .app{ grid-template-columns: 1fr; padding:12px; }
-    .settings{ order:2; width:100%; }
-  }
-</style>
 </head>
-<body data-theme="dark">
-  <div class="app">
-    <!-- CHAT (LEFT) -->
-    <section class="panel">
-      <div class="header">
-        <div>
-          <div class="title">SmartHub AI</div>
-          <div class="subtitle small">v1.0.3 — Твой помощник</div>
+<body>
+
+<!-- Кнопка настроек в правом верхнем углу -->
+<button class="settings-btn" onclick="toggleSettings()">⚙</button>
+
+<div class="container">
+
+    <!-- ЛЕВАЯ ЧАСТЬ — ЧАТ -->
+    <div class="chat-panel">
+        <h2>SmartHub AI</h2>
+
+        <div id="chat"></div>
+
+        <div class="input-area">
+            <input id="userInput" type="text" placeholder="Введите сообщение..." onkeydown="if(event.key==='Enter') sendMessage()">
+            <button onclick="sendMessage()">➤</button>
+            <button id="micBtn" onclick="voiceInput()">🎤</button>
+            <button id="speakBtn" onclick="speakLast()">🔊</button>
         </div>
-        <div class="small" id="status">offline</div>
-      </div>
+    </div>
 
-      <div id="chat" aria-live="polite"></div>
+    <!-- ПРАВАЯ ЧАСТЬ — НАСТРОЙКИ (выезжает справа) -->
+    <div id="settingsPanel" class="settings-panel">
 
-      <div class="input">
-        <input id="userInput" type="text" placeholder="Введите сообщение..." onkeydown="if(event.key==='Enter') sendMessage()" />
-        <button id="sendBtn" class="btn btn-primary" onclick="sendMessage()">➤</button>
-        <button id="micBtn" class="btn btn-red" onclick="voiceInput()">🎤</button>
-        <button id="speakBtn" class="btn btn-green" onclick="speakLast()">🔊</button>
-      </div>
-    </section>
+        <h3>⚙ Настройки</h3>
 
-    <!-- SETTINGS (RIGHT) -->
-    <aside class="settings">
-      <h3>⚙ Настройки</h3>
-
-      <div class="row">
-        <div>
-          <div class="label">Тема</div>
-          <div class="small">Светлая / Тёмная</div>
+        <div class="setting-block">
+            <label>Тема</label>
+            <select id="themeSelect" onchange="setTheme(this.value)">
+                <option value="dark">Тёмная</option>
+                <option value="light">Светлая</option>
+            </select>
         </div>
-        <div class="switch">
-          <select id="themeSelect" onchange="setTheme(this.value)">
-            <option value="dark">Тёмная</option>
-            <option value="light">Светлая</option>
-          </select>
+
+        <div class="setting-block">
+            <label>Автоозвучка</label>
+            <input type="checkbox" id="autoVoice" onchange="toggleAutoVoice(this.checked)">
         </div>
-      </div>
 
-      <div class="row">
-        <div>
-          <div class="label">Озвучка ответа</div>
-          <div class="small">Автоозвучка при ответе</div>
+        <div class="setting-block">
+            <label>Голос</label>
+            <select id="voiceSelect" onchange="setVoiceGender(this.value)">
+                <option value="female">Женский</option>
+                <option value="male">Мужской</option>
+            </select>
         </div>
-        <div>
-          <input id="autoVoice" type="checkbox" onchange="toggleAutoVoice(this.checked)" />
+
+        <div class="setting-block">
+            <label>Скорость речи</label>
+            <input type="range" min="0.5" max="1.8" step="0.1" id="speechRate" onchange="setSpeechRate(this.value)">
         </div>
-      </div>
 
-      <div class="row">
-        <div>
-          <div class="label">Голос</div>
-          <div class="small">Выбор муж/жен</div>
+        <div class="setting-block">
+            <label>Скорость печати</label>
+            <input type="range" min="6" max="60" id="typeSpeed" onchange="setTypeSpeed(this.value)">
         </div>
-        <div>
-          <select id="voiceSelect" onchange="setVoiceGender(this.value)">
-            <option value="female">Женский</option>
-            <option value="male">Мужской</option>
-          </select>
+
+        <div class="setting-block">
+            <button onclick="clearHistory()">Очистить чат</button>
         </div>
-      </div>
 
-      <div class="row">
-        <div class="label">Скорость печати</div>
-        <div><input id="typeSpeed" type="range" min="6" max="60" value="18" oninput="setTypeSpeed(this.value)"/></div>
-      </div>
+        <div class="version">SmartHub AI v1.0.3</div>
+    </div>
 
-      <div class="row">
-        <div class="label">Скорость речи</div>
-        <div><input id="speechRate" type="range" min="0.5" max="1.8" step="0.1" value="1" oninput="setSpeechRate(this.value)"/></div>
-      </div>
+</div>
 
-      <div class="row">
-        <div class="label">Сброс истории</div>
-        <div><button class="btn" onclick="clearHistory()">Очистить</button></div>
-      </div>
-
-      <div id="version">SmartHub AI v1.0.3</div>
-    </aside>
-  </div>
-
-<script>
-/* ---------- Конфигурация прокси и состояние ---------- */
-const API_URL = "https://openai-proxy-ucgy.onrender.com/v1/responses"; // твой прокси
-let lastAIMessage = "";
-let autoVoice = false;
-let voiceGender = 'female'; // по умолчанию (женский)
-let typeSpeed = 18; // ms per char
-let speechRate = 1.0;
-
-/* ---------- LocalStorage: загрузка/сохранение настроек ---------- */
-function saveSettings() {
-  const s = { theme: document.body.dataset.theme || 'dark', autoVoice, voiceGender, typeSpeed, speechRate };
-  localStorage.setItem('smarthub_settings', JSON.stringify(s));
-}
-function loadSettings() {
-  const raw = localStorage.getItem('smarthub_settings');
-  if (!raw) return;
-  try {
-    const s = JSON.parse(raw);
-    document.body.dataset.theme = s.theme || 'dark';
-    document.getElementById('themeSelect').value = s.theme || 'dark';
-    autoVoice = !!s.autoVoice;
-    document.getElementById('autoVoice').checked = autoVoice;
-    voiceGender = s.voiceGender || 'female';
-    document.getElementById('voiceSelect').value = voiceGender;
-    typeSpeed = s.typeSpeed || 18;
-    document.getElementById('typeSpeed').value = typeSpeed;
-    speechRate = s.speechRate || 1.0;
-    document.getElementById('speechRate').value = speechRate;
-  } catch(e){ console.warn('loadSettings',e); }
-}
-loadSettings();
-
-/* ---------- UI helpers ---------- */
-function setTheme(v){ document.body.dataset.theme = v; saveSettings(); }
-function toggleAutoVoice(v){ autoVoice = !!v; saveSettings(); }
-function setVoiceGender(v){ voiceGender = v; saveSettings(); }
-function setTypeSpeed(v){ typeSpeed = Number(v); saveSettings(); }
-function setSpeechRate(v){ speechRate = Number(v); saveSettings(); }
-
-/* ---------- Chat rendering ---------- */
-const chatElem = document.getElementById('chat');
-function scrollToBottom(){ chatElem.scrollTop = chatElem.scrollHeight; }
-
-function createAvatar(isUser){
-  const a = document.createElement('div');
-  a.className = 'avatar';
-  if(isUser){
-    // user: simple image-ish circle (placeholder)
-    a.innerHTML = '<div style="width:100%;height:100%;border-radius:50%;background:linear-gradient(135deg,#ffd28a,#ff9a76);display:flex;align-items:center;justify-content:center;font-weight:700;color:#111">U</div>';
-  } else {
-    // AI: 3D sphere by CSS
-    const s = document.createElement('div');
-    s.className = 'sphere';
-    a.appendChild(s);
-  }
-  return a;
-}
-
-function addMessage(text, sender, options = {}) {
-  const wrap = document.createElement('div');
-  wrap.className = 'msg ' + (sender === 'user' ? 'user' : 'ai');
-
-  const avatar = createAvatar(sender === 'user');
-  if(options.speaking) avatar.classList.add('speaking');
-
-  const bubble = document.createElement('div');
-  bubble.className = 'bubble';
-
-  if(options.typing){
-    const typing = document.createElement('div');
-    typing.className = 'typing';
-    typing.innerHTML = '<span class="dot"></span><span class="dot"></span><span class="dot"></span>';
-    bubble.appendChild(typing);
-  } else {
-    // bubble text and optional speak button for AI
-    bubble.textContent = text;
-    if(sender !== 'user'){
-      const btn = document.createElement('button');
-      btn.className = 'btn';
-      btn.style.marginLeft = '8px';
-      btn.style.fontWeight = '600';
-      btn.textContent = '🔊';
-      btn.onclick = () => speak(text);
-      // put small inline button (append)
-      const wrapper = document.createElement('div');
-      wrapper.style.display = 'flex';
-      wrapper.style.alignItems = 'center';
-      wrapper.appendChild(bubble);
-      wrapper.appendChild(btn);
-      // replace bubble with wrapper
-      const container = wrapper;
-      wrap.appendChild(avatar);
-      wrap.appendChild(container);
-      chatElem.appendChild(wrap);
-      scrollToBottom();
-      return { wrap, avatar, bubble: container };
-    }
-  }
-
-  wrap.appendChild(avatar);
-  wrap.appendChild(bubble);
-  chatElem.appendChild(wrap);
-  scrollToBottom();
-  return { wrap, avatar, bubble };
-}
-
-/* ---------- печать текста по буквам ---------- */
-async function typeTextInto(element, text, speed){
-  element.textContent = '';
-  for(let i=0;i<text.length;i++){
-    element.textContent += text[i];
-    await new Promise(r => setTimeout(r, speed));
-  }
-}
-
-/* ---------- sendMessage: взаимодействие с прокси ---------- */
-async function sendMessage(){
-  const input = document.getElementById('userInput');
-  const text = (input.value || '').trim();
-  if(!text) return;
-  input.value = '';
-  addMessage(text, 'user');
-
-  // add typing indicator and mark avatar speaking
-  const tNode = addMessage('', 'ai', { typing:true, speaking:true });
-  const avatar = tNode.avatar;
-  avatar.classList.add('speaking');
-
-  // send request in Responses API format
-  try{
-    const res = await fetch(API_URL, {
-      method: 'POST',
-      headers: {'Content-Type':'application/json'},
-      body: JSON.stringify({ model: "gpt-4.1-mini", input: text })
-    });
-    const data = await res.json();
-    // determine AI text
-    // common shapes: data.output_text OR data.output[0].content[0].text
-    let aiText = '';
-    if(data.output_text) aiText = data.output_text;
-    else if(data.output && data.output[0] && data.output[0].content && data.output[0].content[0] && data.output[0].content[0].text) aiText = data.output[0].content[0].text;
-    else aiText = JSON.stringify(data).substring(0,400);
-
-    lastAIMessage = aiText;
-
-    // remove typing indicator & speaking class, then print text smoothly
-    avatar.classList.remove('speaking');
-    // replace bubble content with typing effect
-    const bubble = tNode.bubble.querySelector ? tNode.bubble.querySelector('.bubble') : tNode.bubble;
-    // if we used special container with button, handle differently
-    let targetEl = null;
-    if(tNode.bubble.classList && tNode.bubble.classList.contains('bubble')) targetEl = tNode.bubble;
-    else {
-      // tNode.bubble may be wrapper; find first .bubble inside
-      targetEl = tNode.bubble.querySelector('.bubble') || tNode.bubble;
-    }
-    // clear bubble
-    targetEl.innerHTML = '';
-    await typeTextInto(targetEl, aiText, typeSpeed);
-
-    // if autoVoice on, speak
-    if(autoVoice) speak(aiText);
-
-  }catch(err){
-    console.error(err);
-    avatar.classList.remove('speaking');
-    // replace typing with error
-    const bubble = tNode.bubble;
-    bubble.innerHTML = '';
-    bubble.textContent = 'Ошибка: не удалось получить ответ от сервера.';
-  }
-}
-
-/* ---------- speak functions: pick voice by gender & rate ---------- */
-function speak(text){
-  try{
-    stopSpeech();
-    const synth = window.speechSynthesis;
-    if(!synth) return;
-    const voices = synth.getVoices();
-    let chosen = null;
-    // prefer ru voices
-    const prefer = voiceGender === 'female' ? ['female','frau','anna','alyona','alena','irina','oksana'] : ['male','oleg','nikolai','ivan','male'];
-    // naive matching by name
-    for(const p of prefer){
-      chosen = voices.find(v => v.lang && v.lang.startsWith('ru') && v.name && v.name.toLowerCase().includes(p));
-      if(chosen) break;
-    }
-    if(!chosen){
-      // fallback: any ru voice
-      chosen = voices.find(v => v.lang && v.lang.startsWith('ru'));
-    }
-    if(!chosen && voices.length) chosen = voices[0];
-
-    const u = new SpeechSynthesisUtterance(text);
-    if(chosen) u.voice = chosen;
-    u.lang = chosen ? chosen.lang : 'ru-RU';
-    u.rate = speechRate || 1.0;
-    speakingUtterance = u;
-    window.speechSynthesis.speak(u);
-    u.onend = ()=> speakingUtterance = null;
-  }catch(e){ console.warn(e); }
-}
-function stopSpeech(){ try{ const s = window.speechSynthesis; if(s && s.speaking) s.cancel(); }catch(e){console.warn(e);} }
-function speakLast(){ if(!lastAIMessage) return alert('Нет текста для озвучки'); speak(lastAIMessage); }
-
-/* ---------- voice input (microphone) ---------- */
-function voiceInput(){
-  const R = window.SpeechRecognition || window.webkitSpeechRecognition;
-  if(!R) return alert('Ваш браузер не поддерживает распознавание речи');
-  const rec = new R();
-  rec.lang = 'ru-RU';
-  rec.start();
-  const mic = document.getElementById('micBtn');
-  mic.textContent = '●';
-  mic.style.background = '#ffa200';
-  rec.onresult = e => {
-    const t = e.results[0][0].transcript;
-    const input = document.getElementById('userInput');
-    input.value = t;
-  };
-  rec.onend = ()=>{ document.getElementById('micBtn').textContent='🎤'; document.getElementById('micBtn').style.background=''; }
-}
-
-/* ---------- history & storage ---------- */
-function clearHistory(){ if(confirm('Очистить чат?')){ chatElem.innerHTML=''; localStorage.removeItem('smarthub_history'); } }
-
-/* ---------- startup: restore settings and voices ---------- */
-function init(){
-  loadSettings();
-  // apply theme select
-  document.getElementById('themeSelect').value = document.body.dataset.theme || 'dark';
-  document.getElementById('autoVoice').checked = autoVoice;
-  document.getElementById('voiceSelect').value = voiceGender;
-  document.getElementById('typeSpeed').value = typeSpeed;
-  document.getElementById('speechRate').value = speechRate;
-  // warm-up voices (load)
-  window.speechSynthesis.getVoices(); // may be async
-  // update status
-  const st = document.getElementById('status');
-  st.textContent = 'готов';
-  // try to load saved chat? optional
-}
-init();
-
-/* save settings when page unload */
-window.addEventListener('beforeunload', saveSettings);
-</script>
-</body>
-</html>
+<!-- Подключени
