@@ -104,7 +104,7 @@
       gap: 10px;
       align-items: center;
     }
-    .input-row input {
+    .input-row input[type="text"] {
       flex: 1;
       padding: 12px 14px;
       border-radius: 12px;
@@ -113,6 +113,10 @@
       color: inherit;
       outline: none;
     }
+    .input-row input[type="file"] {
+      display: none;
+    }
+
     .icon-btn, .small-btn {
       cursor: pointer;
       display: inline-flex;
@@ -168,7 +172,9 @@
       <div class="header">SmartHub AI</div>
       <div id="chat" class="chat-window" aria-live="polite" role="log"></div>
       <div class="input-row">
-        <input id="userInput" placeholder="Введите сообщение..." autocomplete="off" />
+        <input id="userInput" type="text" placeholder="Введите сообщение..." autocomplete="off" />
+        <label for="imageInput" class="small-btn" title="Загрузить фото">📷</label>
+        <input id="imageInput" type="file" accept="image/*" />
         <button class="icon-btn" id="sendBtn" title="Отправить">➤</button>
         <button class="small-btn" id="micBtn" title="Голосовой ввод">🎤</button>
         <button class="small-btn" id="speakBtn" title="Озвучить">🔊</button>
@@ -180,220 +186,180 @@
 
     <aside class="settings" id="settingsPanel">
       <h3>⚙ Настройки</h3>
-
       <div class="field">
-        <label class="switch-label">Тема:</label>
         <label><input type="checkbox" id="themeSwitch"> Светлая тема</label>
       </div>
-
       <div class="field">
-        <label class="switch-label">Озвучка:</label>
+        <label>Озвучка:</label>
         <select id="voiceSelect">
           <option value="female">Женский</option>
           <option value="male">Мужской</option>
         </select>
       </div>
-
-      <div class="field">
-        <label class="switch-label">Аватар пользователя:</label>
-        <img id="avatarPreview" class="avatar-preview" alt="avatar preview" />
-        <div class="avatar-select" id="avatarOptions"></div>
-      </div>
-
       <button id="clearBtn" style="padding:12px;background:#ff7b00;border:none;border-radius:10px;color:#001;font-weight:700;cursor:pointer">🗑 Очистить чат</button>
-      <div class="small-muted">Параметры сохраняются</div>
     </aside>
   </div>
 
   <script>
     const API_URL = "https://openai-proxy-3.onrender.com/v1/responses";
 
-    let userAvatar = localStorage.getItem('sh_userAvatar') || 'svg:user:1';
     let chatHistory = JSON.parse(localStorage.getItem('sh_chatHistory') || '[]');
     let lastAI = "";
-
     let voicesList = [];
     let selectedVoiceGender = localStorage.getItem('sh_voice_gender') || 'female';
 
-    const AVATARS = {
-      'svg:user:1': `<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 120 120'><defs><linearGradient id='g1' x1='0' x2='1'><stop offset='0' stop-color='#00d4ff'/><stop offset='1' stop-color='#00ffa3'/></linearGradient></defs><rect width='120' height='120' rx='24' fill='url(#g1)'/><g fill='#001' opacity='0.14'><circle cx='60' cy='44' r='20'/><rect x='20' y='74' width='80' height='28' rx='12'/></g><circle cx='60' cy='44' r='18' fill='#fff' opacity='0.15'/></svg>`,
-      'svg:user:2': `<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 120 120'><defs><linearGradient id='g2' x1='0' x2='1'><stop offset='0' stop-color='#7b61ff'/><stop offset='1' stop-color='#ff61b8'/></linearGradient></defs><rect width='120' height='120' rx='24' fill='url(#g2)'/><g fill='#001' opacity='0.14'><circle cx='60' cy='44' r='20'/></g></svg>`,
-      'svg:user:3': `<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 120 120'><defs><linearGradient id='g3' x1='0' x2='1'><stop offset='0' stop-color='#ffb86b'/><stop offset='1' stop-color='#ff6b6b'/></linearGradient></defs><rect width='120' height='120' rx='24' fill='url(#g3)'/></svg>`,
-      'svg:ai:1': `<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 120 120'><rect width='120' height='120' rx='24' fill='#0de7c9'/><circle cx='36' cy='44' r='18' fill='#fff' opacity='.85'/><circle cx='84' cy='44' r='18' fill='#fff' opacity='.65'/></svg>`
-    };
-
-    function svgToDataUrl(svg) {
-      return 'data:image/svg+xml;utf8,' + encodeURIComponent(svg);
-    }
-
-    function buildAvatarOptions() {
-      const container = document.getElementById('avatarOptions');
-      container.innerHTML = '';
-      Object.keys(AVATARS).forEach(key => {
-        if (!key.startsWith('svg:user')) return;
-        const img = document.createElement('img');
-        img.src = svgToDataUrl(AVATARS[key]);
-        img.className = 'avatar-option';
-        img.title = key;
-        img.addEventListener('click', () => { setUserAvatar(key); });
-        container.appendChild(img);
-      });
-      document.getElementById('avatarPreview').src = svgToDataUrl(AVATARS[userAvatar]);
-    }
-
     const chatEl = document.getElementById('chat');
+    const fileInput = document.getElementById('imageInput');
 
-    function renderMessage(item) {
+    function renderMessage(text, role) {
       const wrap = document.createElement('div');
-      wrap.className = 'msg ' + (item.role === 'user' ? 'user' : 'ai');
-      const av = document.createElement('div'); av.className = 'avatar';
-      const img = document.createElement('img'); img.className = 'avatar-img';
-      img.src = item.avatar; img.alt = item.role;
-      img.style.width = '54px'; img.style.height = '54px'; img.style.borderRadius = '50%';
-      av.appendChild(img);
-      const bubble = document.createElement('div'); bubble.className = 'bubble';
-      bubble.textContent = item.text;
-      wrap.appendChild(av); wrap.appendChild(bubble);
+      wrap.className = 'msg ' + role;
+      const bubble = document.createElement('div');
+      bubble.className = 'bubble';
+      bubble.textContent = text;
+      wrap.appendChild(bubble);
       chatEl.appendChild(wrap);
       chatEl.scrollTop = chatEl.scrollHeight;
     }
 
-    function saveAndRenderMessage(text, role) {
-      const avatarData = role === 'user'
-        ? svgToDataUrl(AVATARS[userAvatar])
-        : svgToDataUrl(AVATARS['svg:ai:1']);
-      const item = { text, role, avatar: avatarData, at: Date.now() };
-      chatHistory.push(item);
+    function saveChatHistory() {
       localStorage.setItem('sh_chatHistory', JSON.stringify(chatHistory));
-      renderMessage(item);
-    }
-
-    function loadHistory() {
-      chatEl.innerHTML = '';
-      chatHistory.forEach(renderMessage);
-      chatEl.scrollTop = chatEl.scrollHeight;
     }
 
     function clearChat() {
-      if (!confirm('Очистить весь чат?')) return;
+      if (!confirm("Очистить весь чат?")) return;
       chatHistory = [];
-      localStorage.removeItem('sh_chatHistory');
+      saveChatHistory();
       chatEl.innerHTML = '';
       lastAI = '';
-    }
-
-    function setUserAvatar(key) {
-      if (!AVATARS[key]) return;
-      userAvatar = key;
-      localStorage.setItem('sh_userAvatar', userAvatar);
-      buildAvatarOptions();
     }
 
     function speakText(text) {
       if (!text) return;
       const synth = window.speechSynthesis;
       const utter = new SpeechSynthesisUtterance(text);
+      utter.lang = 'ru-RU';
 
       const pref = document.getElementById('voiceSelect').value;
       let voice = voicesList.find(v => {
         if (pref === 'male') return /male|man/i.test(v.name);
         else return /female|woman/i.test(v.name);
-      });
+      }) || voicesList[0];
 
-      // если не нашёл подходящий — взять первый голос
-      if (!voice && voicesList.length > 0) voice = voicesList[0];
       utter.voice = voice;
-
       localStorage.setItem('sh_voice_gender', pref);
-
       synth.cancel();
       synth.speak(utter);
     }
 
     function startSpeechToText() {
       const Rec = window.SpeechRecognition || window.webkitSpeechRecognition;
-      if (!Rec) { alert('Голосовой ввод не поддерживается'); return; }
-      const r = new Rec();
-      r.lang = 'ru-RU';
-      r.onresult = e => {
+      if (!Rec) { alert("Голосовой ввод не поддерживается"); return; }
+      const rec = new Rec();
+      rec.lang = 'ru-RU';
+      rec.onresult = e => {
         document.getElementById('userInput').value = e.results[0][0].transcript;
       };
-      r.start();
+      rec.start();
     }
 
-    async function sendToProxy(text) {
-      saveAndRenderMessage('...', 'ai');
+    async function sendMessage(text, base64Image = null) {
+      // show that AI is thinking
+      renderMessage("...", "ai");
       try {
+        const body = { model: "gpt-4o-mini", input: text };
+        if (base64Image) {
+          body.image = base64Image; // передаём изображение
+        }
         const resp = await fetch(API_URL, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ model: 'gpt-4o-mini', input: text })
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(body)
         });
         const data = await resp.json();
-        let answer = null;
-        if (data.output && data.output[0]?.content) {
+        let answer = "";
+        if (data.choices && data.choices[0]?.message?.content) {
+          answer = data.choices[0].message.content;
+        } else if (data.output && data.output[0]?.content) {
           const chunks = data.output[0].content;
           const textChunk = chunks.find(c => c.text) || chunks[0];
-          answer = textChunk.text || textChunk.content || '';
-        } else if (data.choices && data.choices[0]?.message) {
-          answer = data.choices[0].message.content;
-        } else if (typeof data === 'string') {
-          answer = data;
+          answer = textChunk.text || textChunk.content || "";
         } else {
-          answer = 'Ошибка: неверный формат ответа от сервера';
+          answer = "Ошибка: неизвестный формат ответа";
         }
-
+        // remove “...” message
         chatHistory.pop();
-        localStorage.setItem('sh_chatHistory', JSON.stringify(chatHistory));
-        saveAndRenderMessage(answer, 'ai');
+        chatHistory.push({ role: "ai", text: answer });
+        saveChatHistory();
+        renderMessage(answer, "ai");
         lastAI = answer;
-      } catch (err) {
+      } catch (e) {
         chatHistory.pop();
-        localStorage.setItem('sh_chatHistory', JSON.stringify(chatHistory));
-        saveAndRenderMessage('Ошибка соединения с сервером', 'ai');
-        console.error(err);
+        saveChatHistory();
+        renderMessage("Ошибка сервера", "ai");
+        console.error(e);
       }
     }
 
     document.getElementById('sendBtn').addEventListener('click', () => {
-      const t = document.getElementById('userInput').value.trim();
-      if (!t) return;
-      document.getElementById('userInput').value = '';
-      saveAndRenderMessage(t, 'user');
-      sendToProxy(t);
-    });
-
-    document.getElementById('userInput').addEventListener('keydown', e => {
-      if (e.key === 'Enter') { e.preventDefault(); document.getElementById('sendBtn').click(); }
+      const txt = document.getElementById('userInput').value.trim();
+      if (!txt) return;
+      chatHistory.push({ role: "user", text: txt });
+      saveChatHistory();
+      renderMessage(txt, "user");
+      sendMessage(txt);
+      document.getElementById('userInput').value = "";
     });
 
     document.getElementById('micBtn').addEventListener('click', startSpeechToText);
-    document.getElementById('clearBtn').addEventListener('click', clearChat);
     document.getElementById('speakBtn').addEventListener('click', () => speakText(lastAI));
+    document.getElementById('clearBtn').addEventListener('click', clearChat);
 
+    // обработка загрузки фото
+    fileInput.addEventListener('change', () => {
+      const file = fileInput.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = () => {
+        const base64 = reader.result.split(',')[1];
+        // отправляем сообщение с изображением
+        chatHistory.push({ role: "user", text: "[изображение]" });
+        saveChatHistory();
+        renderMessage("[изображение]", "user");
+        sendMessage("", base64);
+      };
+      reader.readAsDataURL(file);
+    });
+
+    // тема
     const themeSwitch = document.getElementById('themeSwitch');
     themeSwitch.addEventListener('change', () => {
       const on = themeSwitch.checked;
-      document.body.classList.toggle('light', on);
+      document.body.classList.toggle("light", on);
       localStorage.setItem('sh_theme_is_light', on ? '1' : '0');
     });
 
-    (function init() {
-      loadHistory();
-      buildAvatarOptions();
-
-      const savedTheme = localStorage.getItem('sh_theme_is_light') === '1';
-      themeSwitch.checked = savedTheme;
-      document.body.classList.toggle('light', savedTheme);
-
+    (function init(){
+      // загрузка истории
+      loadSavedAndRender();
+      // выбор голоса
       voicesList = window.speechSynthesis.getVoices();
       window.speechSynthesis.onvoiceschanged = () => {
         voicesList = window.speechSynthesis.getVoices();
       };
-
       const vsel = document.getElementById('voiceSelect');
-      vsel.value = localStorage.getItem('sh_voice_gender') || 'female';
+      vsel.value = selectedVoiceGender;
+      // тема
+      const saved = localStorage.getItem('sh_theme_is_light') === '1';
+      themeSwitch.checked = saved;
+      document.body.classList.toggle("light", saved);
     })();
+
+    function loadSavedAndRender(){
+      chatHistory.forEach(msg => {
+        renderMessage(msg.text, msg.role);
+      });
+    }
 
   </script>
 </body>
